@@ -19,7 +19,9 @@ import yaml
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+for path in (project_root, project_root / "src"):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 from curious_agent.env.grid_world import GridWorld
 from curious_agent.agents.tabular_curious import TabularCuriousAgent
