@@ -266,6 +266,47 @@ class TestDNQCuriousAgent:
             assert torch.equal(online_parameter, target_parameters[name])
             assert not target_parameters[name].requires_grad
 
+    def test_curiosity_normalization_on_by_default(self):
+        """Normalization must be enabled by default and scale the raw signal."""
+        agent = DNQCuriousAgent(
+            state_dim=2,
+            num_actions=4,
+            config={"agent": {"target_intrinsic_scale": 1.0}},
+            device=torch.device("cpu"),
+        )
+
+        assert agent.normalize_curiosity is True
+        assert agent.target_intrinsic_scale == 1.0
+
+        # The raw confidence change is tiny (sigmoid-bounded). Once the running
+        # mean adapts to that magnitude, normalization brings the signal toward
+        # the target scale.
+        o_c_before = 0.60
+        o_c_after = 0.55  # raw curiosity = 0.05
+        agent._running_intrinsic = 0.05  # adapted running mean
+        normalized = agent.compute_curiosity_reward(o_c_before, o_c_after)
+
+        assert normalized == pytest.approx(
+            agent.target_intrinsic_scale * (o_c_before - o_c_after) / 0.05,
+            rel=1e-3,
+        )
+        assert normalized == pytest.approx(1.0, rel=1e-3)
+
+    def test_curiosity_normalization_can_be_disabled(self):
+        """Disabling normalization must return the raw curiosity signal."""
+        agent = DNQCuriousAgent(
+            state_dim=2,
+            num_actions=4,
+            config={"agent": {"normalize_curiosity": False}},
+            device=torch.device("cpu"),
+        )
+
+        assert agent.normalize_curiosity is False
+        reward = agent.compute_curiosity_reward(0.6, 0.55)
+        assert reward == pytest.approx(0.05)
+        # The running mean must not be updated when disabled.
+        assert agent._running_intrinsic == 1e-3
+
 
 class TestVanillaDQNAgent:
     """Tests for the external-reward-only DQN ablation."""

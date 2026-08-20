@@ -12,6 +12,7 @@ def make_args(tmp_path: Path, **overrides) -> Namespace:
         "tabular_config": str(main.DEFAULT_CONFIGS["tabular"]),
         "dqn_config": str(main.DEFAULT_CONFIGS["dqn"]),
         "vanilla_dqn_config": str(main.DEFAULT_CONFIGS["vanilla-dqn"]),
+        "icm_config": str(main.DEFAULT_CONFIGS["icm"]),
         "episodes": 2,
         "max_steps": 3,
         "seed": 7,
@@ -82,7 +83,7 @@ def test_dry_run_does_not_start_training(monkeypatch, tmp_path):
     main.run_pipeline(make_args(tmp_path, dry_run=True))
 
 
-def test_all_pipeline_runs_all_three_agents(monkeypatch, tmp_path):
+def test_all_pipeline_runs_all_four_agents(monkeypatch, tmp_path):
     calls = []
 
     monkeypatch.setitem(
@@ -100,10 +101,15 @@ def test_all_pipeline_runs_all_three_agents(monkeypatch, tmp_path):
         "dqn",
         lambda config, render: calls.append("dqn"),
     )
+    monkeypatch.setitem(
+        main.TRAINERS,
+        "icm",
+        lambda config, render: calls.append("icm"),
+    )
 
     main.run_pipeline(make_args(tmp_path, agent="all"))
 
-    assert calls == ["tabular", "vanilla-dqn", "dqn"]
+    assert calls == ["tabular", "vanilla-dqn", "dqn", "icm"]
 
 
 def test_dqn_pair_runs_vanilla_before_curiosity(monkeypatch, tmp_path):
