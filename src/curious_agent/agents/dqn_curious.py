@@ -70,6 +70,12 @@ class DNQCuriousAgent:
         self.epsilon = agent_config.get("epsilon", 1.0)
         self.epsilon_min = agent_config.get("epsilon_min", 0.01)
         self.epsilon_decay = agent_config.get("epsilon_decay", 0.9995)
+
+        # Curiosity normalization.
+        # Normalize raw curiosity to keep beta comparable across agents.
+        self.normalize_curiosity = agent_config.get("normalize_curiosity", True)
+        self.target_intrinsic_scale = agent_config.get("target_intrinsic_scale", 1.0)
+        self._running_intrinsic = 1e-3
         
         # Network configuration
         networks_config = self.config.get("networks", {})
@@ -282,7 +288,17 @@ class DNQCuriousAgent:
         Returns:
             Curiosity reward
         """
-        return o_c_before - o_c_after
+        raw_curiosity = o_c_before - o_c_after
+        if not self.normalize_curiosity:
+            return raw_curiosity
+
+        self._running_intrinsic = (
+            0.99 * self._running_intrinsic + 0.01 * abs(raw_curiosity)
+        )
+        normalized = (
+            raw_curiosity / (self._running_intrinsic + 1e-8)
+        ) * self.target_intrinsic_scale
+        return normalized
     
     def store_experience(
         self,

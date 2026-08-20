@@ -121,9 +121,11 @@ class ConfidenceNetwork(nn.Module):
         # Add batch dimension
         if state.dim() == 1:
             state = state.unsqueeze(0)
-        
-        # Create one-hot action
-        action_one_hot = torch.zeros(1, self.num_actions)
+
+        # Create one-hot action on the same device as the state
+        action_one_hot = torch.zeros(
+            1, self.num_actions, device=state.device
+        )
         action_one_hot[0, action] = 1.0
         
         # Forward pass
