@@ -1,0 +1,90 @@
+environment:
+  grid_size: 10
+  num_actions: 4
+
+  zones:
+    static:
+      percentage: 0.1
+      color: [128, 128, 128]
+
+    deterministic_a:
+      percentage: 0.3
+      color: [0, 255, 0]
+      rule: "shift_up"
+
+    deterministic_b:
+      percentage: 0.2
+      color: [0, 0, 255]
+      rule: "shift_right"
+
+    noisy:
+      percentage: 0.2
+      color: [255, 0, 0]
+      behavior: "random"
+
+    dynamic:
+      percentage: 0.2
+      color: [255, 255, 0]
+      switch_interval: 100
+      rules: ["shift_up", "shift_right"]
+
+  goal:
+    position: [9, 9]
+    reward: 1.0
+
+networks:
+  icm:
+    feature_dim: 32
+    hidden_dims: [64]
+    learning_rate: 0.001
+
+  q_network:
+    input_dim: 6
+    hidden_dims: [128, 128]
+    output_dim: 4
+    learning_rate: 0.001
+
+    use_dueling: true
+    value_hidden_dim: 64
+    advantage_hidden_dim: 64
+
+agent:
+  epsilon: 1.0
+  epsilon_min: 0.01
+  epsilon_decay: 0.9995
+
+  beta: 1.0
+  eta: 1.0
+  inverse_weight: 0.2
+  normalize_curiosity: true
+  target_intrinsic_scale: 1.0
+
+  gamma: 0.99
+
+training:
+  num_episodes: 2000
+  max_steps_per_episode: 200
+
+  batch_size: 64
+  buffer_size: 10000
+  min_buffer_size: 1000
+
+  target_update_frequency: 100
+  tau: 0.005
+
+  log_interval: 10
+  save_interval: 100
+
+  num_envs: 16
+
+  seed: 42
+
+visualization:
+  enabled: true
+  cell_size: 50
+  fps: 10
+
+paths:
+  checkpoints: "checkpoints/icm"
+  logs: "logs/icm"
+  results: "results/icm"
