@@ -27,6 +27,7 @@ DEFAULT_CONFIGS = {
     "tabular": PROJECT_ROOT / "configs" / "tabular.yaml",
     "dqn": PROJECT_ROOT / "configs" / "dqn.yaml",
     "vanilla-dqn": PROJECT_ROOT / "configs" / "vanilla_dqn.yaml",
+    "icm": PROJECT_ROOT / "configs" / "icm.yaml",
 }
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,17 @@ def run_tabular(config: dict, render: bool) -> None:
 
 
 def run_dqn(config: dict, render: bool) -> None:
-    """Load and run the DQN trainer."""
-    from scripts.train_dqn import train_dqn
+    """Load and run the DQN trainer.
 
-    train_dqn(config, render=render)
+    Uses the vectorized trainer when multi-env is enabled.
+    """
+    num_envs = config.get("training", {}).get("num_envs", 1)
+    if num_envs > 1:
+        from scripts.train_dqn_vec import train_dqn_vec
+        train_dqn_vec(config, render=render)
+    else:
+        from scripts.train_dqn import train_dqn
+        train_dqn(config, render=render)
 
 
 def run_vanilla_dqn(config: dict, render: bool) -> None:
@@ -53,10 +61,25 @@ def run_vanilla_dqn(config: dict, render: bool) -> None:
     train_vanilla_dqn(config, render=render)
 
 
+def run_icm(config: dict, render: bool) -> None:
+    """Load and run the ICM (Pathak) DQN trainer.
+
+    Uses the vectorized trainer when multi-env is enabled.
+    """
+    num_envs = config.get("training", {}).get("num_envs", 1)
+    if num_envs > 1:
+        from scripts.train_dqn_icm_vec import train_dqn_icm_vec
+        train_dqn_icm_vec(config, render=render)
+    else:
+        from scripts.train_dqn_icm import train_dqn_icm
+        train_dqn_icm(config, render=render)
+
+
 TRAINERS: dict[str, Callable[[dict, bool], None]] = {
     "tabular": run_tabular,
     "dqn": run_dqn,
     "vanilla-dqn": run_vanilla_dqn,
+    "icm": run_icm,
 }
 
 
@@ -119,11 +142,13 @@ def prepare_config(
 def selected_agents(agent_option: str) -> list[str]:
     """Expand the requested pipeline into an execution order."""
     if agent_option == "all":
-        return ["tabular", "vanilla-dqn", "dqn"]
+        return ["tabular", "vanilla-dqn", "dqn", "icm"]
     if agent_option == "both":
         return ["tabular", "dqn"]
     if agent_option == "dqn-pair":
         return ["vanilla-dqn", "dqn"]
+    if agent_option == "curious-pair":
+        return ["dqn", "icm"]
     return [agent_option]
 
 
@@ -149,7 +174,8 @@ def _resolve_log_files(
 AGENT_LABELS: dict[str, str] = {
     "tabular": "Tabular Q-Learning",
     "vanilla-dqn": "Vanilla DQN",
-    "dqn": "Curious DQN",
+    "dqn": "Curious DQN (Schmidhuber)",
+    "icm": "ICM DQN (Pathak)",
 }
 
 
@@ -190,6 +216,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "tabular": Path(args.tabular_config).expanduser().resolve(),
         "dqn": Path(args.dqn_config).expanduser().resolve(),
         "vanilla-dqn": Path(args.vanilla_dqn_config).expanduser().resolve(),
+        "icm": Path(args.icm_config).expanduser().resolve(),
     }
     output_dir = (
         Path(args.output_dir).expanduser().resolve()
@@ -235,7 +262,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     pipeline_start = time.monotonic()
     for agent_name, config, seed in experiments:
         logger.info("Starting %s experiment", agent_name)
-        set_seed(seed, include_torch=agent_name in {"dqn", "vanilla-dqn"})
+        set_seed(seed, include_torch=agent_name in {"dqn", "vanilla-dqn", "icm"})
         experiment_start = time.monotonic()
         TRAINERS[agent_name](config, render=args.render)
         logger.info(
@@ -263,12 +290,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--agent",
-        choices=("tabular", "dqn", "vanilla-dqn", "dqn-pair", "both", "all"),
+        choices=("tabular", "dqn", "vanilla-dqn", "icm", "dqn-pair", "curious-pair", "both", "all"),
         default="both",
         help=(
             "Experiment to run. 'dqn-pair' runs the vanilla baseline followed "
-            "by curiosity-coupled DQN. 'all' runs all three: tabular, "
-            "vanilla DQN, and curious DQN."
+            "by curiosity-coupled DQN. 'curious-pair' runs the Schmidhuber DQN "
+            "followed by the Pathak ICM DQN for a direct curiosity comparison. "
+            "'all' runs all four: tabular, vanilla DQN, curious DQN, and ICM DQN."
         ),
     )
     parser.add_argument(
@@ -285,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--vanilla-dqn-config",
         default=str(DEFAULT_CONFIGS["vanilla-dqn"]),
         help="Path to the vanilla DQN YAML configuration.",
+    )
+    parser.add_argument(
+        "--icm-config",
+        default=str(DEFAULT_CONFIGS["icm"]),
+        help="Path to the ICM DQN YAML configuration.",
     )
     parser.add_argument(
         "--episodes",

@@ -75,6 +75,9 @@ agent:
   
   # Curiosity
   beta: 1.0  # Curiosity weight
+  # Normalize curiosity so beta stays comparable across agents.
+  normalize_curiosity: true
+  target_intrinsic_scale: 1.0
   
   # Discount factor
   gamma: 0.99
@@ -99,6 +102,9 @@ training:
   # Logging
   log_interval: 10  # Log every 10 episodes
   save_interval: 100  # Save checkpoint every 100 episodes
+  
+  # Vectorized training
+  num_envs: 16  # parallel environments for GPU utilization
   
   # Random seed
   seed: 42
